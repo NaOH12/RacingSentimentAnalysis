@@ -51,14 +51,14 @@ class ACCDataset(Dataset):
 
         # Load the file
         data = np.load(os.path.join(self._sample_dir, f"{file_id}.npy"), allow_pickle=True).item()
-        sample_data = data['data']
-        invalids = data['invalids']
+        sample_data = data['data'].astype(np.float32)
+        invalids = data['invalids'].astype(np.float32)
         # Track data
         track_id = data['track_id']
         track_data = self._track_data[track_id]
-        left_track = track_data['left_track']
-        right_track = track_data['right_track']
-        racing_line = track_data['racing_line']
+        left_track = track_data['left_track'].astype(np.float32)
+        right_track = track_data['right_track'].astype(np.float32)
+        racing_line = track_data['racing_line'].astype(np.float32)
 
         # Construct probability map for the data based on car proximity.
         # Compute square distance between cars
@@ -116,7 +116,7 @@ class ACCDataset(Dataset):
             [np.cos(angle), 0, np.sin(angle)],
             [0, 1, 0],
             [-np.sin(angle), 0, np.cos(angle)]
-        ])
+        ]).astype(np.float32)
 
         # Sample data shape (n, n_cars, c, 3) -> (n * n_cars * c, 3)
         sample_data_shape = sample_data.shape
@@ -144,16 +144,20 @@ class ACCDataset(Dataset):
         # plt.show()
         # plt.close()
 
+        # Move the focus car to the first position
+        sample_data = np.roll(sample_data, -focus_car_idx, axis=1)
+
         # Construct the training data
         return {
             # The directions of the cars with magnitude
-            'directions': sample_data[0, focus_car_idx, 1] - sample_data[0, focus_car_idx, 3],
+            'directions': sample_data[0, :, 1] - sample_data[0, :, 3],
             # Just the first samples
             'car_positions': sample_data[0:1],
             # The "optimal" racing line to provide some guidance.
-            'racing_line': racing_line,
+            'racing_line': racing_line
         }, {
-            'car_positions': sample_data[1:], # The rest of the samples
+            # The rest of the samples
+            'car_positions': sample_data[1:]
         }
 
 
