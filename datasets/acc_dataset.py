@@ -9,12 +9,14 @@ from torch.utils.data import Dataset
 class ACCDataset(Dataset):
     def __init__(self, *args, **kwargs):
         # Number of future frames to predict
-        self._future_frames = kwargs.get('future_frames', 20)
+        self._future_frames = kwargs.get('num_frames', 50)
         # Skip the first few frames to get initial direction info
         self._start_skip_frames = kwargs.get('start_skip_frames', 2)
         # Limit the number of racing line points and cars to consider
         self._max_distance = kwargs.get('max_distance', 50)
         self._max_square_distance = self._max_distance ** 2
+        self._max_cars = kwargs.get('max_cars', 32)
+        self._max_racing_line_points = kwargs.get('max_racing_line_points', 1000)
 
         self._data_dir = kwargs.get('data_dir', 'C:\\Users\\noahl\Documents\ACCDataset')
         self._sample_dir = os.path.join(self._data_dir, 'race_data')
@@ -98,11 +100,15 @@ class ACCDataset(Dataset):
 
         # TODO Assert invalids
 
-        # Center translation
+        # Here we lose the notion of the "focus car".
+        # Instead we will take the mean of the racing line points.
+        # TODO Maybe revert this...
+        mean_point = racing_line.mean(0)
+
         translation_vector = sample_data[0, focus_car_idx, 0]
-        racing_line = racing_line - translation_vector[None, :]
-        prev_frame = prev_frame - translation_vector[None, None, :]
-        sample_data = sample_data - translation_vector[None, None, None, :]
+        racing_line = racing_line - mean_point[None, :]
+        prev_frame = prev_frame - mean_point[None, None, :]
+        sample_data = sample_data - mean_point[None, None, None, :]
 
         # Rotate the data based on focus car direction. Shape is (3,)
         # Focus car orientation
@@ -111,7 +117,9 @@ class ACCDataset(Dataset):
         focus_car_direction /= np.linalg.norm(focus_car_direction)
 
         # Construct 3d rotation matrix
-        angle = np.arctan2(focus_car_direction[0], focus_car_direction[2])
+        # angle = np.arctan2(focus_car_direction[0], focus_car_direction[2])
+        # Random angle TODO Maybe change this...
+        angle = np.random.uniform(-np.pi, np.pi)
         rotation_matrix = np.array([
             [np.cos(angle), 0, np.sin(angle)],
             [0, 1, 0],
@@ -144,20 +152,34 @@ class ACCDataset(Dataset):
         # plt.show()
         # plt.close()
 
-        # Move the focus car to the first position
-        sample_data = np.roll(sample_data, -focus_car_idx, axis=1)
+        # # Move the focus car to the first position
+        # sample_data = np.roll(sample_data, -focus_car_idx, axis=1)
+
+        # Pad the sample_data with zeros to get the maximum number of cars
+        n_cars = sample_data.shape[1]
+        sample_data = np.concatenate([
+            sample_data,
+            np.zeros((
+                sample_data.shape[0], self._max_cars - sample_data.shape[1],
+                sample_data.shape[2], sample_data.shape[3]
+            ), dtype=np.float32)
+        ], axis=1)
+        # Pad the racing line with zeros to get the maximum number of points
+        n_racing_line_points = racing_line.shape[0]
+        racing_line = np.concatenate([
+            racing_line,
+            np.zeros((self._max_racing_line_points - racing_line.shape[0], 3), dtype=np.float32)
+        ], axis=0)
 
         # Construct the training data
         return {
+            'num_cars': n_cars,
+            'num_racing_line_points': n_racing_line_points,
+            'sample_data': sample_data,
+            # The "optimal" racing line to provide some guidance.
+            'racing_line': racing_line,
             # The directions of the cars with magnitude
             'directions': sample_data[0, :, 1] - sample_data[0, :, 3],
-            # Just the first samples
-            'car_positions': sample_data[0:1],
-            # The "optimal" racing line to provide some guidance.
-            'racing_line': racing_line
-        }, {
-            # The rest of the samples
-            'car_positions': sample_data[1:]
         }
 
 
