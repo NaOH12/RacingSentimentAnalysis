@@ -4,3 +4,4 @@
 /datasets/builder/rpy/
 .idea
 .idea.old
+/lightning_logs/

@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch.xpu import device
 
 from models.state_encoder import StateEncoder
 
@@ -31,13 +32,13 @@ class VAEDecoder(nn.Module):
             nn.Linear(self._hidden_dim, self._num_frames * 3),
         )
 
-    def forward(self, x, latent, mask=None):
+    def forward(self, x, latent, mask=None, device=None):
         new_x = {**x}
         new_x['sample_data'] = x['sample_data'][:, 0:1]
         # Decoded latent representation
         decoded_latent = self._decode_latent(latent)
         # Encode the track points, initial car positions and velocities
-        state = self._state_encoder(new_x, embeddings=decoded_latent, mask=mask)
+        state = self._state_encoder(new_x, embeddings=decoded_latent, mask=mask, device=device)
         # outputs = x['sample_data'][:, 0:1, :, 0, :]
         # # TODO use an autoregressive decoder to predict the future frames
         # # Encoder state is (bs, num_cars, dim)

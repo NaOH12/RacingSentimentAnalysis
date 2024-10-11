@@ -7,8 +7,6 @@ from tqdm import tqdm
 if __name__ == '__main__':
     data_dir = 'C:\\Users\\noahl\Documents\ACCDataset/race_data/'
     track_dir = 'C:\\Users\\noahl\Documents\ACCDataset/track_data/'
-    meta_dir = 'C:\\Users\\noahl\Documents\ACCDataset/meta_data/'
-    os.makedirs(meta_dir, exist_ok=True)
 
     # Store dataset related meta e.g. number of nearby cars
     # which can be used as a metric for biasing the sampling.
@@ -43,10 +41,14 @@ if __name__ == '__main__':
         #     'probabilities': weight / weight.sum(),
         # }, allow_pickle=True)
 
+        if (~data['invalids']).any() is False:
+            break
+
         file_meta[file_id] = {
             'file_weight': weight.sum(),
             'file_num_samples': (~invalids).shape[0],
             'file_num_cars': num_cars,
+            'track_id': data['track_id'],
         }
 
     total_weight = sum([meta['file_weight'] for meta in file_meta.values()])

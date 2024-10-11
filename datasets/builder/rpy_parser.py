@@ -3,6 +3,7 @@ import struct
 import matplotlib.pyplot as plt
 import numpy
 import numpy as np
+from torchaudio.functional import resample
 
 
 class ByteCounter:
@@ -732,8 +733,14 @@ class RaceData:
         diff_mask = np.concatenate([np.ones(diff_mask[0:1].shape), diff_mask], axis=0).astype(np.int32)
         invalids = diff_mask.astype(np.bool) | invalids.astype(np.bool)
 
+        # There are cases of many invalid cars.
+        # To qualify as a valid car, it must have at least one valid data point...
+        valid_mask = (~invalids).sum(0) >= 1
+        resampled_data = resampled_data[:, valid_mask]
+        invalids = invalids[:, valid_mask]
+
         return {
-            "data": resampled_data,
+            "data": resampled_data.astype(np.float32),
             "invalids": invalids
         }
 

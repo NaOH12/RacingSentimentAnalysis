@@ -1,28 +1,37 @@
 import os
-
 import numpy as np
 import cv2
-
-from renderer import Box, Colour, Sphere, Camera, SceneViewer
+from visualize.renderer import Box, Colour, Sphere, Camera, SceneViewer, Line
 
 
 class ReplayPlayer:
-    def __init__(self, file_id=None, data_dir=None, track_dir=None):
-        self._data_dir = data_dir
-        self._track_dir = track_dir
+    def __init__(self, sample_data, border_data, racing_line_data, invalids=None, preds=None):
+        self._sample_data = sample_data
+        self._invalids = invalids
+        self._track_points = border_data
+        self._racing_line_points = racing_line_data
+        self._sample_preds = preds
 
+    @classmethod
+    def from_file(cls, file_id=None, data_dir=None, track_dir=None):
         # Load race data
         data_file = f"{data_dir}{file_id}.npy"
-        self._data = np.load(data_file, allow_pickle=True).item()
+        data = np.load(data_file, allow_pickle=True).item()
 
         # Load track data
-        track_id = self._data['track_id']
+        track_id = data['track_id']
         track_file = f"{track_dir}{track_id}.npy"
         if os.path.exists(track_file):
-            self._track = np.load(track_file, allow_pickle=True).item()
+            track = np.load(track_file, allow_pickle=True).item()
         else:
-            self._track = None
+            track = None
 
+        samples = data['data']
+        invalids = data['invalids']
+        track_points = np.concatenate([track['left_track'], track['right_track']], axis=0)
+        racing_line_points = track['racing_line']
+
+        return cls(samples, invalids, track_points, racing_line_points)
 
     @classmethod
     def _move_camera(cls, camera, key):
@@ -64,29 +73,22 @@ class ReplayPlayer:
             camera.focal_length -= 1
             print("Focal Length: ", camera.focal_length)
 
-    def render(self, car_focus_id):
+    def render(self, car_focus_id, to_numpy=False, window_size=(1600, 800)):
         # OpenCV 3D rendering of the data
         # Iterate over the packet ids (as timesteps)
         # Render the track points (as sphere circle points)
         # and the car contactPoints (as vertices of the rectangle base of a 3D box of height 10)
 
-        # Create window
-        window_name = "3D Rendering"
-        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-        window_size = (1600, 800)
-        cv2.resizeWindow(window_name, *window_size)
+        window_size = window_size
 
-        # # Create track points
-        # track_points = self._build_track()
+        if to_numpy:
+            out = []
+        else:
+            window_name = "3D Rendering"
+            cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+            cv2.resizeWindow(window_name, *window_size)
 
-        # Session data {time_id: {car_id: contactPoint_id: np array of shape (3,)}}
-        # session_data = self._build_data()
-
-        samples = self._data['data']
-        invalids = self._data['invalids']
-        track_points = np.concatenate([self._track['left_track'], self._track['right_track']], axis=0)
-        racing_line_points = self._track['racing_line']
-        num_samples, num_cars, c, _ = samples.shape
+        num_cars = self._sample_data.shape[1]
 
         car_objects = [
             Box(height=2, colour=Colour.pink())
@@ -94,13 +96,20 @@ class ReplayPlayer:
         ]
         track_point_spheres = [
             Sphere(radius=1, point=point, colour=Colour.dark_blue())
-            for point in track_points
+            for point in self._track_points
         ]
         racing_line_spheres  = [
             Sphere(radius=1, point=point, colour=Colour.green())
-            for point in racing_line_points
+            for point in self._racing_line_points
         ]
         # racing_line_spheres = []
+        if self._sample_preds is not None:
+            predicted_paths = []
+        else:
+            predicted_paths = [
+                Line(colour=Colour.red(), points=line)
+                for line in self._sample_preds
+            ]
 
         distance = 10
         camera = Camera(
@@ -112,10 +121,10 @@ class ReplayPlayer:
         graphs = []
 
         scene_viewer = SceneViewer(
-            objects=car_objects + track_point_spheres + racing_line_spheres + graphs,
+            objects=car_objects + track_point_spheres + racing_line_spheres + graphs + predicted_paths,
             camera=camera,
             background_colour=Colour.cream(),
-            max_render_distance=50
+            max_render_distance=75
         )
 
         count = 0
@@ -123,16 +132,15 @@ class ReplayPlayer:
         direction = np.array([0, 0, 1])
 
         # Iterate over packet IDs (timesteps)
-        for idx, (data_sample, sample_invalids) in enumerate(zip(samples, invalids)):
+        for idx, data_sample in enumerate(self._sample_data):
 
             # Skip invalid data
-            if sample_invalids[car_focus_id] == True:
+            if self._invalids is not None and self._invalids[idx][car_focus_id] == True:
                 continue
 
             # Update the car objects with the contact points
             for car_id, car_data in enumerate(data_sample):
                 # Wait (delay) 0.1 seconds
-                # cv2.waitKey(1)
                 car_object = car_objects[car_id]
                 # Get the contact points
                 coords = car_data[0]
@@ -181,22 +189,27 @@ class ReplayPlayer:
             # Render the scene
             canvas = scene_viewer.render()
 
-            # Display the rendered image in the window
-            cv2.imshow(window_name, canvas)
+            if to_numpy:
+                out.append(canvas.copy())
+            else:
+                # Display the rendered image in the window
+                cv2.imshow(window_name, canvas)
+                # Wait
+                key = cv2.waitKey(1)
+                self._move_camera(camera, key)
 
-            # Wait
-            key = cv2.waitKey(1)
-            self._move_camera(camera, key)
+                # Change the distance of the camera
+                if key == ord('z'):
+                    distance += 100
+                    print("Distance: ", distance)
+                elif key == ord('x'):
+                    distance -= 100
+                    print("Distance: ", distance)
 
-            # Change the distance of the camera
-            if key == ord('z'):
-                distance += 100
-                print("Distance: ", distance)
-            elif key == ord('x'):
-                distance -= 100
-                print("Distance: ", distance)
+        if to_numpy is False:
+            cv2.destroyAllWindows()
 
-        cv2.destroyAllWindows()
+        return out
 
 
 if __name__ == '__main__':
@@ -204,6 +217,6 @@ if __name__ == '__main__':
     data_dir = 'C:\\Users\\noahl\Documents\ACCDataset/race_data/'
     # data_dir = "datasets/builder/ghost_data/"
     track_dir = 'C:\\Users\\noahl\Documents\ACCDataset/track_data/'
-    race_data = ReplayPlayer(file_id='10006', data_dir=data_dir, track_dir=track_dir)
+    race_data = ReplayPlayer.from_file(file_id='12754', data_dir=data_dir, track_dir=track_dir)
 
-    race_data.render(car_focus_id=5)
+    race_data.render(car_focus_id=1)

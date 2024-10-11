@@ -15,39 +15,51 @@ class VAE(nn.Module):
         self._encoder = VAEEncoder(num_frames=num_frames, latent_dim=latent_dim)
         self._decoder = VAEDecoder(num_frames=num_frames, latent_dim=latent_dim)
 
-    def _construct_mask(self, x):
+    def _construct_mask(self, x, device=None):
         # Since we have variable number of cars and track points we need
         # to mask the attention mechanism
-        car_mask = torch.zeros_like(x['sample_data'][:, 0, :, 0, 0]).bool()
-        car_mask_square = torch.zeros(car_mask.shape[0], car_mask.shape[1], car_mask.shape[1])
+        car_mask = torch.ones_like(x['sample_data'][:, 0, :, 0, 0], device=device).bool()
+        # car_mask_square = torch.zeros(car_mask.shape[0], car_mask.shape[1], car_mask.shape[1])
         for i, num_cars in enumerate(x['num_cars']):
-            car_mask[i, num_cars:] = True
-            car_mask_square[i, num_cars:, num_cars:] = -torch.inf
+            car_mask[i, num_cars:] = False
+            # car_mask_square[i, num_cars:, num_cars:] = -torch.inf
 
-        track_mask = torch.zeros_like(x['racing_line'][:, :, 0]).bool()
-        track_mask_square = torch.zeros(track_mask.shape[0], track_mask.shape[1], track_mask.shape[1])
-        for i, num_points in enumerate(x['num_racing_line_points']):
-            track_mask[i, num_points:] = True
-            track_mask_square[i, num_points:, num_points:] = -torch.inf
+        num_border_points = x['num_border_points']
+        num_racing_line_points = x['num_racing_line_points']
+        border_points = x['border_points']
+        racing_line_points = x['racing_line_points']
+        border_points_mask = x['border_points_mask']
+        racing_line_points_mask = x['racing_line_points_mask']
+
+        bs = x['sample_data'].shape[0]
+        track_mask = torch.ones((bs, border_points.shape[1] + racing_line_points.shape[1]), device=device).bool()
+        for i in range(bs):
+            track_mask[i, (x['num_border_points'][i] + x['num_racing_line_points'][i]):] = False
 
         return {
             'car_mask': car_mask,
-            'car_mask_square': car_mask_square,
+            # 'car_mask_square': car_mask_square,
             'track_mask': track_mask,
-            'track_mask_square': track_mask_square
+            # 'track_mask_square': track_mask_square
         }
 
-    def forward(self, x, device=None):
-        mask = self._construct_mask(x)
+    def forward(self, x):
+        device = x['sample_data'].device
 
-        mu, log_var = self._encoder(x, mask=mask)
+        mask = self._construct_mask(x, device=device)
+
+        mu, log_var = self._encoder(x, mask=mask, device=device)
 
         if self.training:
             latent = mu + torch.exp(0.5 * log_var) * torch.randn_like(mu)
         else:
             latent = mu
 
-        reconstruct = self._decoder(x, latent, mask=mask)
+        reconstruct = self._decoder(x, latent, mask=mask, device=device)
+
+        # Add reconstruct to x
+        reconstruct += x['sample_data'][:, 0:1, :, 0, :]
+
         return mu, log_var, latent, reconstruct
 
 
@@ -59,12 +71,14 @@ if __name__ == '__main__':
     loader = DataLoader(dataset, batch_size=1, shuffle=True)
 
     for x in loader:
+        # Convert items in x to cuda
+        for key in x:
+            x[key] = x[key].cuda()
         if x['sample_data'].shape[2] <= 1:
             continue
         break
 
-    model = VAE(num_frames=num_frames, latent_dim=2)
-    model.train()
+    model = VAE(num_frames=num_frames, latent_dim=2).cuda()
 
     # Get param count
     print(f"Number of parameters: {sum(p.numel() for p in model.parameters())}")

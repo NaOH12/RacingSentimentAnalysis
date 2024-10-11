@@ -182,6 +182,22 @@ class Colour(tuple[3]):
     def pink(cls):
         return cls.from_hex("CB48B7")
 
+    @classmethod
+    def red(cls):
+        return cls.from_hex("FF0000")
+
+    @classmethod
+    def blue(cls):
+        return cls.from_hex("0000FF")
+
+    @classmethod
+    def grey(cls):
+        return cls.from_hex("808080")
+
+    @classmethod
+    def dark_grey(cls):
+        return cls.from_hex("A9A9A9")
+
 
 class Box(Object):
     def __init__(self, height: float, base_corners: np.ndarray = None, colour: Colour = Colour.green()):
@@ -239,6 +255,30 @@ class Sphere(Object):
         if projected_point is None:
             return
         cv2.circle(canvas, tuple((projected_point.astype(np.int16))[0]), int(self.radius), self._colour, -1)
+
+
+class Line(Object):
+    def __init__(self, colour: Colour = Colour.green(), points: np.ndarray = None):
+        self.points = points
+        self._colour = colour
+
+    @property
+    def position(self):
+        if self.points is None:
+            return np.zeros(3)
+        return self.points.mean(0)
+
+    def draw(self, canvas: np.ndarray, camera: Camera):
+        if self.points is None:
+            return
+        projected_points = camera.project_points(copy.deepcopy(self.points))
+        if projected_points is None:
+            return
+        for i in range(len(projected_points) - 1):
+            cv2.line(
+                canvas, tuple(projected_points[i].astype(np.int16)), tuple(projected_points[i + 1].astype(np.int16)),
+                self._colour, 1
+            )
 
 
 class GraphArray(Object):
