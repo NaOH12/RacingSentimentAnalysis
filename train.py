@@ -1,5 +1,5 @@
 from lightning import Trainer
-from lightning.pytorch.callbacks import ModelSummary
+from lightning.pytorch.callbacks import ModelSummary, ModelCheckpoint
 from lightning.pytorch.loggers import WandbLogger
 from torch.utils.data import DataLoader
 
@@ -22,7 +22,10 @@ if __name__ == '__main__':
     # Define the trainer
     trainer = Trainer(
         max_epochs=1, logger=wandb_logger,
-        callbacks=[ModelSummary(max_depth=4)],
+        callbacks=[
+            ModelSummary(max_depth=4),
+            ModelCheckpoint(dirpath='checkpoints/')
+        ],
         # limit_val_batches=0
         limit_train_batches=1000,
     )

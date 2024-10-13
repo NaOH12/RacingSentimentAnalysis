@@ -18,7 +18,7 @@ class VAEDecoder(nn.Module):
             nn.Linear(self._hidden_dim, self._hidden_dim),
             nn.ReLU(),
         )
-        self._state_encoder = StateEncoder(num_frames=1, hidden_dim=self._hidden_dim)
+        self._state_encoder = StateEncoder(mode='decoder', hidden_dim=self._hidden_dim)
         # self._self_attn = nn.MultiheadAttention(
         #     embed_dim=self._hidden_dim, num_heads=4
         # )
@@ -34,7 +34,7 @@ class VAEDecoder(nn.Module):
 
     def forward(self, x, latent, mask=None, device=None):
         new_x = {**x}
-        new_x['sample_data'] = x['sample_data'][:, 0:1]
+        new_x['sample_data'] = x['sample_data'][:, :x['start_skip_frames'][0]+1]
         # Decoded latent representation
         decoded_latent = self._decode_latent(latent)
         # Encode the track points, initial car positions and velocities

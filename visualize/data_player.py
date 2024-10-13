@@ -27,11 +27,12 @@ class ReplayPlayer:
             track = None
 
         samples = data['data']
-        invalids = data['invalids']
+        invalids = np.ones((samples.shape[0], samples.shape[1]))
+        invalids[1:] = ((samples[1:, :, 0].round(3) - samples[:-1, :, 0].round(3)) == 0).all(-1)
         track_points = np.concatenate([track['left_track'], track['right_track']], axis=0)
         racing_line_points = track['racing_line']
 
-        return cls(samples, invalids, track_points, racing_line_points)
+        return cls(samples, track_points, racing_line_points, invalids=invalids)
 
     @classmethod
     def _move_camera(cls, camera, key):
@@ -95,15 +96,15 @@ class ReplayPlayer:
             for _ in range(num_cars)
         ]
         track_point_spheres = [
-            Sphere(radius=1, point=point, colour=Colour.dark_blue())
+            Sphere(radius=2, point=point, colour=Colour.dark_blue())
             for point in self._track_points
         ]
         racing_line_spheres  = [
-            Sphere(radius=1, point=point, colour=Colour.green())
+            Sphere(radius=2, point=point, colour=Colour.green())
             for point in self._racing_line_points
         ]
         # racing_line_spheres = []
-        if self._sample_preds is not None:
+        if self._sample_preds is None:
             predicted_paths = []
         else:
             predicted_paths = [
@@ -135,7 +136,9 @@ class ReplayPlayer:
         for idx, data_sample in enumerate(self._sample_data):
 
             # Skip invalid data
-            if self._invalids is not None and self._invalids[idx][car_focus_id] == True:
+            if (
+                    self._invalids is not None and self._invalids[idx][car_focus_id] == True
+            ) or (data_sample[car_focus_id, 0] == np.array([0, 0, 0])).all() == True:
                 continue
 
             # Update the car objects with the contact points
@@ -155,6 +158,10 @@ class ReplayPlayer:
                 # Compute the car direction by comparing the first and third contact points
                 car_direction = contact_points[2] - contact_points[0]
                 car_direction = car_direction / np.linalg.norm(car_direction)
+
+                # If nan
+                if np.isnan(car_direction).any():
+                    car_direction = np.array([0, 0, 1])
 
                 if car_id == car_focus_id:
                     focus_point = coords
@@ -198,14 +205,6 @@ class ReplayPlayer:
                 key = cv2.waitKey(1)
                 self._move_camera(camera, key)
 
-                # Change the distance of the camera
-                if key == ord('z'):
-                    distance += 100
-                    print("Distance: ", distance)
-                elif key == ord('x'):
-                    distance -= 100
-                    print("Distance: ", distance)
-
         if to_numpy is False:
             cv2.destroyAllWindows()
 
@@ -214,9 +213,9 @@ class ReplayPlayer:
 
 if __name__ == '__main__':
     # file_name = "data/16209.npy"
-    data_dir = 'C:\\Users\\noahl\Documents\ACCDataset/race_data/'
+    data_dir = 'C:\\Users\\noahl\Documents\ACCDataset/session_data/val/'
     # data_dir = "datasets/builder/ghost_data/"
     track_dir = 'C:\\Users\\noahl\Documents\ACCDataset/track_data/'
-    race_data = ReplayPlayer.from_file(file_id='12754', data_dir=data_dir, track_dir=track_dir)
+    race_data = ReplayPlayer.from_file(file_id='4', data_dir=data_dir, track_dir=track_dir)
 
-    race_data.render(car_focus_id=1)
+    race_data.render(car_focus_id=5, window_size=(1200, 800))

@@ -5,3 +5,7 @@
 .idea
 .idea.old
 /lightning_logs/
+/checkpoints/
+/datasets/builder/track_data/
+/wandb/
+/datasets/builder/error_log.txt

@@ -17,7 +17,7 @@ class LitVAEModule(L.LightningModule):
 
     def step(self, x):
         mu, log_var, latent, reconstruct = self.model(x)
-        target = x['sample_data'][:, :, :, 0, :]
+        target = x['sample_data'][:, x['start_skip_frames'][0]:, :, 0, :]
 
         # VAE loss with regularization
         recon_loss = torch.nn.functional.mse_loss(reconstruct, target)
@@ -27,7 +27,7 @@ class LitVAEModule(L.LightningModule):
         if self.training and self.global_step % 5 == 0:
             num_cars = x['num_cars'][0]
             vis_cars, vis_border_points, vis_racing_line_points, vis_reconstruct = (
-                x['sample_data'][0, 0:1, :num_cars].cpu().numpy(),
+                x['sample_data'][0, x['start_skip_frames'][0]:x['start_skip_frames'][0]+1, :num_cars].cpu().numpy(),
                 x['border_points'][0].cpu().numpy(),
                 x['racing_line_points'][0].cpu().numpy(),
                 reconstruct[0:1, :, :num_cars].detach().cpu().numpy()
@@ -61,11 +61,11 @@ class LitVAEModule(L.LightningModule):
             plt.show()
             plt.close()
 
-        return recon_loss * 0.002 + kl_loss
+        return recon_loss + 0.002 * kl_loss
 
     def training_step(self, batch, batch_idx):
         loss = self.step(batch)
-        self.log('train_loss', loss)
+        self.log('train_loss', loss, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -75,4 +75,5 @@ class LitVAEModule(L.LightningModule):
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
-        return optimizer
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.1)
+        return [optimizer], [scheduler]

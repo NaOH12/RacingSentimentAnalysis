@@ -7,7 +7,7 @@ from models.state_encoder import StateEncoder
 class VAEEncoder(nn.Module):
     def __init__(self, latent_dim=2, num_frames=20):
         super().__init__()
-        self._state_encoder = StateEncoder(num_frames=num_frames)
+        self._state_encoder = StateEncoder(mode='encoder')
         self._encode_state = nn.Sequential(
             nn.Linear(32, 16),
             nn.ReLU(),

@@ -51,14 +51,19 @@ class VAE(nn.Module):
         mu, log_var = self._encoder(x, mask=mask, device=device)
 
         if self.training:
-            latent = mu + torch.exp(0.5 * log_var) * torch.randn_like(mu)
+            std = torch.exp(0.5 * log_var)
+            eps = torch.randn_like(std)
+            latent = mu + eps * std
         else:
             latent = mu
 
         reconstruct = self._decoder(x, latent, mask=mask, device=device)
 
+        # Each previous prediction is added to the next prediction
+        for i in range(1, reconstruct.shape[1]):
+            reconstruct[:, i] += reconstruct[:, i-1]
         # Add reconstruct to x
-        reconstruct += x['sample_data'][:, 0:1, :, 0, :]
+        reconstruct += x['sample_data'][:, x['start_skip_frames'][0]:x['start_skip_frames'][0]+1, :, 0, :]
 
         return mu, log_var, latent, reconstruct
 
@@ -68,7 +73,7 @@ if __name__ == '__main__':
     # Test the ACCDataset
     dataset = ACCDataset(num_frames=num_frames)
     # Create a dataloader
-    loader = DataLoader(dataset, batch_size=1, shuffle=True)
+    loader = DataLoader(dataset, batch_size=2, shuffle=True)
 
     for x in loader:
         # Convert items in x to cuda

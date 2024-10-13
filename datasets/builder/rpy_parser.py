@@ -741,7 +741,7 @@ class RaceData:
 
         return {
             "data": resampled_data.astype(np.float32),
-            "invalids": invalids
+            # "invalids": invalids
         }
 
 

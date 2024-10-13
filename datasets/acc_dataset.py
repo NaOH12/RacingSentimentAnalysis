@@ -108,6 +108,8 @@ class ACCDataset(Dataset):
         except Exception as e:
             pass
 
+        # TODO ***
+
         # Filter data by computing square distances across the sequence, and selecting
         # data that exists within the min distance at least once in the episode.
         # Filter the track points
@@ -131,20 +133,15 @@ class ACCDataset(Dataset):
         # Get new focus car index
         focus_car_idx = np.where(np.where(car_filter)[0] == focus_car_idx)[0][0]
 
-        # Select the previous frames for direction calculation
-        prev_frame = sample_data[frame_idx-self._start_skip_frames]
-        prev_invalids = invalids[frame_idx-self._start_skip_frames]
-
         # Select the sequence data
-        sample_data = sample_data[frame_idx:frame_idx+self._future_frames]
-        invalids = invalids[frame_idx:frame_idx+self._future_frames]
-
-        # TODO Assert invalids
+        sample_data = sample_data[frame_idx-self._start_skip_frames:frame_idx+self._future_frames]
+        invalids = invalids[frame_idx-self._start_skip_frames:frame_idx+self._future_frames]
 
         # Here we lose the notion of the "focus car".
         # Instead we will take the mean of the racing line points.
         # TODO Maybe revert this...
         mean_point = border_points.mean(0)
+
         border_points = border_points - mean_point[None, :]
         racing_line_points = racing_line_points - mean_point[None, :]
         sample_data = sample_data - mean_point[None, None, None, :]
@@ -170,26 +167,10 @@ class ACCDataset(Dataset):
 
         # Rotate the data
         sample_data = np.matmul(sample_data, rotation_matrix)
-        prev_frame = np.matmul(prev_frame, rotation_matrix)
         border_points = np.matmul(border_points, rotation_matrix)
         racing_line_points = np.matmul(racing_line_points, rotation_matrix)
 
         sample_data = sample_data.reshape(*sample_data_shape)
-
-        # # Visualize
-        # import matplotlib.pyplot as plt
-        # vis_data = sample_data[0:1, :, 0].reshape(-1, sample_data.shape[3])
-        # # Plot the racing line in green
-        # plt.scatter(racing_line[:, 0], racing_line[:, 2], c='g')
-        # plt.scatter(vis_data[:, 0], vis_data[:, 2])
-        # # Visualize direction
-        # plt.arrow(
-        #     sample_data[0, focus_car_idx, 0, 0], sample_data[0, focus_car_idx, 0, 2],
-        #     focus_car_direction[0], focus_car_direction[2],
-        #     color='r', head_width=2, head_length=20
-        # )
-        # plt.show()
-        # plt.close()
 
         # # Move the focus car to the first position
         # sample_data = np.roll(sample_data, -focus_car_idx, axis=1)
@@ -201,14 +182,6 @@ class ACCDataset(Dataset):
             np.zeros((
                 sample_data.shape[0], self._max_cars - sample_data.shape[1],
                 sample_data.shape[2], sample_data.shape[3]
-            ), dtype=np.float32)
-        ], axis=1)
-        prev_frame = np.concatenate([
-            prev_frame,
-            np.zeros((
-                prev_frame.shape[0],
-                self._max_cars - prev_frame.shape[1],
-                prev_frame.shape[2]
             ), dtype=np.float32)
         ], axis=1)
         # Pad the track points with zeros to get the maximum number of points
@@ -237,6 +210,7 @@ class ACCDataset(Dataset):
 
         # Construct the training data
         return {
+            'start_skip_frames': self._start_skip_frames,
             'num_cars': num_cars,
             'sample_data': sample_data,
             # Track information
@@ -246,9 +220,6 @@ class ACCDataset(Dataset):
             'racing_line_points': racing_line_points,
             'border_points_mask': border_points_mask,
             'racing_line_points_mask': racing_line_points_mask,
-            # The directions of the cars with magnitude
-            # 'directions': sample_data[0, :, 1] - sample_data[0, :, 3],
-            'initial_velocity': sample_data[0, :, 0] - prev_frame[0, :],
         }
 
 
