@@ -9,3 +9,4 @@
 /datasets/builder/track_data/
 /wandb/
 /datasets/builder/error_log.txt
+/graphics/mp4_to_gif.py
