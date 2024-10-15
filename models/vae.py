@@ -10,10 +10,13 @@ from models.vae_encoder import VAEEncoder
 
 
 class VAE(nn.Module):
-    def __init__(self, num_frames, latent_dim):
+    def __init__(self, num_frames, latent_dim, hidden_dim=None, skip_frames=None):
         super().__init__()
-        self._encoder = VAEEncoder(num_frames=num_frames, latent_dim=latent_dim)
-        self._decoder = VAEDecoder(num_frames=num_frames, latent_dim=latent_dim)
+        self._encoder = VAEEncoder(num_frames=num_frames, latent_dim=latent_dim, hidden_dim=hidden_dim)
+        self._decoder = VAEDecoder(
+            num_frames=num_frames, latent_dim=latent_dim,
+            hidden_dim=hidden_dim, skip_frames=skip_frames
+        )
 
     def _construct_mask(self, x, device=None):
         # Since we have variable number of cars and track points we need
@@ -59,11 +62,11 @@ class VAE(nn.Module):
 
         reconstruct = self._decoder(x, latent, mask=mask, device=device)
 
-        # Each previous prediction is added to the next prediction
-        for i in range(1, reconstruct.shape[1]):
-            reconstruct[:, i] += reconstruct[:, i-1]
+        # # Each previous prediction is added to the next prediction
+        # for i in range(1, reconstruct.shape[1]):
+        #     reconstruct[:, i] += reconstruct[:, i-1]
         # Add reconstruct to x
-        reconstruct += x['sample_data'][:, x['start_skip_frames'][0]:x['start_skip_frames'][0]+1, :, 0, :]
+        # reconstruct += x['sample_data'][:, 0:1, :, 0, :]
 
         return mu, log_var, latent, reconstruct
 
