@@ -48,7 +48,7 @@ class ACCDataset(Dataset):
         #     file_meta['file_num_samples']
         #     for file_id, file_meta in self._file_meta.items()
         # ])
-        return len(self._file_ids) * 100
+        return len(self._file_ids)
 
     def _load_file(self, file_id):
         # if self._is_data_cached and file_id in self._data_cache:

@@ -1,6 +1,9 @@
+import math
+
 import numpy as np
 import torch
 from torch import nn
+from torch import functional as F
 
 
 class StateEncoder(nn.Module):
@@ -15,6 +18,7 @@ class StateEncoder(nn.Module):
         self._hidden_dim = hidden_dim
         # Car state encoder
         if self._mode == 'encoder':
+            # TODO Does this make sense?
             # Encoder mode
             self._car_encoder = nn.Sequential(
                 # Provide the car with contact coords only, the velocity is already encoded in the multiple frame info.
@@ -33,7 +37,9 @@ class StateEncoder(nn.Module):
             # Decoder mode
             self._car_encoder = nn.Sequential(
                 # Provide the car contact coords, velocity and behaviour embedding
-                nn.Linear(5 * 3 + 3 + self._hidden_dim, self._hidden_dim),
+                nn.Linear(3 + 3 + self._hidden_dim, self._hidden_dim),
+                nn.LeakyReLU(),
+                nn.Linear(self._hidden_dim, self._hidden_dim),
                 nn.LeakyReLU(),
                 nn.Linear(self._hidden_dim, self._hidden_dim),
                 nn.LeakyReLU(),
@@ -47,9 +53,10 @@ class StateEncoder(nn.Module):
             nn.Linear(3, self._hidden_dim),
             nn.LeakyReLU(),
         )
+
         # There are variable number of cars and track points...
         self._car_track_transformer = nn.Transformer(
-            nhead=4, num_encoder_layers=1, num_decoder_layers=1, batch_first=True,
+            nhead=1, num_encoder_layers=1, num_decoder_layers=1, batch_first=True,
             d_model=self._hidden_dim, dim_feedforward=self._hidden_dim
         )
 
@@ -102,7 +109,7 @@ class StateEncoder(nn.Module):
             # Apply car-track transformer
             state = self._car_track_transformer(
                 track_encodings, car_encoding,
-                src_key_padding_mask=~track_mask, tgt_key_padding_mask=~car_mask
+                # src_key_padding_mask=~track_mask, tgt_key_padding_mask=~car_mask
             )
             states.append(state)
 
