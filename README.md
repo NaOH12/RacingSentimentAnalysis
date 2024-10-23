@@ -7,7 +7,7 @@ Sim-racing games often suffer from poor moderation and often unfairly penalize b
 We provide a large-scale dataset that enables the analysis of human driver behaviour.
 ### Contributions
 - Dataset of 2,014 race sessions across 11 tracks.
-- VAE based model. (todo)
+- VAE based model (in progress).
 
 ## Dataset
 
@@ -73,7 +73,7 @@ The npy files are structured as follows:
 where the arrays have shape `(n, 3)`.
 
 ### Download
-> Dataset is free to use and available to download from [racing-sentiment-analysis]().
+> Dataset is free to use and available to download from [HuggingFace](https://huggingface.co/datasets/NaOHL1/OnlineSimRacing).
 > 
 >Please consider [reaching out](https://www.linkedin.com/in/noahl1/) if you are hiring! 😊
 
