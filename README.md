@@ -73,7 +73,7 @@ The npy files are structured as follows:
 where the arrays have shape `(n, 3)`.
 
 ### Download
-> Dataset is free to use and available to download from [HuggingFace](https://huggingface.co/datasets/NaOHL1/OnlineSimRacing).
+> Dataset is free to use and available to download from [HuggingFace](https://huggingface.co/datasets/NaOHL1/MultiHumanCarRacing).
 > 
 >Please consider [reaching out](https://www.linkedin.com/in/noahl1/) if you are hiring! 😊
 
